@@ -14,6 +14,13 @@ from src.auth import fake_auth
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _mask_header(value: Optional[str]) -> Optional[str]:
+    """Mask a sensitive header value for logging, keeping only a short prefix."""
+    if not value:
+        return value
+    return f"{value[:8]}...({len(value)} chars)"
+
 # ---------- 数据模型 ----------
 
 class ModelUsageRecord(BaseModel):
@@ -153,6 +160,14 @@ def _do_authenticate(
     raw_key = fake_auth.extract_key(authorization, x_api_key, x_goog_api_key)
     matched_key = fake_auth.validate(raw_key)
 
+    logger.debug(
+        f"Auth headers: authorization={_mask_header(authorization)}, "
+        f"x_api_key={_mask_header(x_api_key)}, "
+        f"x_goog_api_key={_mask_header(x_goog_api_key)}, "
+        f"user_agent={user_agent}, x_resource_for={x_resource_for}, "
+        f"x_forwarded_for={x_forwarded_for}, x_real_ip={x_real_ip}"
+    )
+
     if matched_key is None:
         logger.warning(
             f"Auth failed: request_id={request_id}, endpoint={endpoint}, "
@@ -209,7 +224,7 @@ async def record_model_usage(
         elapsed = (time.time() - start_time) * 1000
         logger.info(
             f"Recorded usage: request_id={record.request_id}, "
-            f"model={record.model}, user_key={record.user_key[:10]}..., "
+            f"model={record.model}, user_key={record.user_key}, "
             f"tokens={record.total_tokens} in {elapsed:.2f}ms"
         )
         
